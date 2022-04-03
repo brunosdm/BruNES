@@ -1,185 +1,23 @@
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <unordered_map>
 #include "cpu.h"
-#include "mappers.h"
 
-
-void CPU::reset() {
-    cycles = 7;
-    A = 0;
-    X = 0;
-    Y = 0;
-    SP = 0xFD;
-    PC = mem(0xFFFD)*256 + mem(0xFFFC);
-    STATUS = 0x24;
+CPU::instructions::instructions() {
+    opcode_to_inst = opcode_map();
 }
 
-unsigned char CPU::mem(unsigned short int address) {
-    return mapper->cpu_mem(address);
+void CPU::instructions::run_instruction(CPU &cpu, unsigned char opcode) {
+    if (opcode_to_inst.find(opcode) == opcode_to_inst.end()) {
+            std::stringstream error;
+            error << std::cout << "\nOpcode " << std::setw(2) << std::setfill('0') << std::hex << (int) opcode << " not implemented or invalid!";
+            throw std::runtime_error(error.str());
+    };
+    opcode_to_inst[opcode](cpu);
 }
 
-void CPU::mem_store(unsigned short int address, unsigned char value) {
-    mapper->cpu_mem_store(address, value);
-}
-
-void CPU::set_ZN(unsigned char value) {
-    if (value == 0) set_zero();
-    else clear_zero();
-
-    if (value >= 128) set_negative();
-    else clear_negative();
-}
-
-void CPU::stack_push(unsigned char value) {
-    mem_store(0x0100 + SP, value);
-    SP--;
-}
-
-void CPU::stack_push_16bit(unsigned short int value) {
-    stack_push(value >> 8);
-    stack_push(value & 0xFF);
-}
-
-unsigned char CPU::stack_pull() {
-    SP++;
-    return mem(0x0100 + SP);
-}
-
-unsigned short int CPU::stack_pull_16bit() {
-    unsigned short int value = stack_pull();
-    return stack_pull()*256 + value;
-}
-
-bool CPU::page_cross_AX() {
-    if (mem(PC+1) + X > 0xFF) return true;
-    return false;
-}
-
-bool CPU::page_cross_AY() {
-    if (mem(PC+1) + Y > 0xFF) return true;
-    return false;
-}
-
-bool CPU::page_cross_IY() {
-    if (mem(mem(PC+1)) + Y > 0xFF) return true;
-    return false;
-}
-
-unsigned char CPU::get_carry() {
-    return (bool) (STATUS & 0x01);
-}
-
-unsigned char CPU::get_zero() {
-    return (bool) (STATUS & 0x02);
-}
-
-unsigned char CPU::get_interrupt_disable() {
-    return (bool) (STATUS & 0x04);
-}
-
-unsigned char CPU::get_brk() {
-    return (bool) (STATUS & 0x10);
-}
-
-unsigned char CPU::get_overflow() {
-    return (bool) (STATUS & 0x40);
-}
-
-unsigned char CPU::get_negative() {
-    return (bool) (STATUS & 0x80);
-}
-
-void CPU::set_carry() {
-    STATUS = STATUS | 0x01;
-}
-
-void CPU::set_zero() {
-    STATUS = STATUS | 0x02;
-}
-
-void CPU::set_interrupt_disable() {
-    STATUS = STATUS | 0x04;
-}
-
-void CPU::set_decimal() {
-    STATUS = STATUS | 0x08;
-}
-
-void CPU::set_brk() {
-    STATUS = STATUS | 0x10;
-}
-
-void CPU::set_overflow() {
-    STATUS = STATUS | 0x40;
-}
-
-void CPU::set_negative() {
-    STATUS = STATUS | 0x80;
-}
-
-void CPU::clear_carry() {
-    STATUS = STATUS & 0xFE;
-}
-
-void CPU::clear_zero() {
-    STATUS = STATUS & 0xFD;
-}
-
-void CPU::clear_interrupt_disable() {
-    STATUS = STATUS & 0xFB;
-}
-
-void CPU::clear_decimal() {
-    STATUS = STATUS & 0xF7;
-}
-
-void CPU::clear_brk() {
-    STATUS = STATUS & 0xEF;
-}
-
-void CPU::clear_overflow() {
-    STATUS = STATUS & 0xBF;
-}
-
-void CPU::clear_negative() {
-    STATUS = STATUS & 0x7F;
-}
-
-// The addressing functions return the address of the operand, not the operand itself.
-unsigned short int CPU::ZP_addressing() {
-    return mem(PC+1);
-}
-
-unsigned short int CPU::ZPX_addressing() {
-    return (mem(PC+1) + X) & 0xFF;
-}
-
-unsigned short int CPU::ZPY_addressing() {
-    return (mem(PC+1) + Y) & 0xFF;
-}
-
-unsigned short int CPU::A_addressing() {
-    return mem(PC+2)*256 + mem(PC+1);
-}
-
-unsigned short int CPU::AX_addressing() {
-    return mem(PC+2)*256 + mem(PC+1) + X;
-}
-
-unsigned short int CPU::AY_addressing() {
-    return mem(PC+2)*256 + mem(PC+1) + Y;
-}
-
-unsigned short int CPU::IX_addressing() {
-    return mem((mem(PC+1) + X + 1) & 0xFF)*256 + mem((mem(PC+1) + X) & 0xFF);
-}
-
-unsigned short int CPU::IY_addressing() {
-    return mem((mem(PC+1) + 1) & 0xFF)*256 + mem(mem(PC+1)) + Y;
-}
-
-
-void ADC(CPU &cpu, unsigned char operand) {
+void CPU::instructions::ADC(CPU &cpu, unsigned char operand) {
     unsigned short int add = cpu.A + operand + cpu.get_carry();
 
     if (add > 255) cpu.set_carry();
@@ -194,35 +32,35 @@ void ADC(CPU &cpu, unsigned char operand) {
     cpu.set_ZN(cpu.A);
 }
 
-void ADC_I(CPU &cpu) {
+void CPU::instructions:: ADC_I(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.PC+1));
 
     cpu.cycles += 2;
     cpu.PC += 2;
 }
 
-void ADC_ZP(CPU &cpu) {
+void CPU::instructions::ADC_ZP(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.ZP_addressing()));
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void ADC_ZPX(CPU &cpu) {
+void CPU::instructions::ADC_ZPX(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.ZPX_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void ADC_A(CPU &cpu) {
+void CPU::instructions::ADC_A(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.A_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void ADC_AX(CPU &cpu) {
+void CPU::instructions::ADC_AX(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.AX_addressing()));
 
     if (cpu.page_cross_AX()) cpu.cycles++;
@@ -230,7 +68,7 @@ void ADC_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ADC_AY(CPU &cpu) {
+void CPU::instructions::ADC_AY(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.AY_addressing()));
 
     if (cpu.page_cross_AY()) cpu.cycles++;
@@ -238,14 +76,14 @@ void ADC_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ADC_IX(CPU &cpu) {
+void CPU::instructions::ADC_IX(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.IX_addressing()));
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void ADC_IY(CPU &cpu) {
+void CPU::instructions::ADC_IY(CPU &cpu) {
     ADC(cpu, cpu.mem(cpu.IY_addressing()));
 
     if (cpu.page_cross_IY()) cpu.cycles++;
@@ -253,41 +91,41 @@ void ADC_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void AND(CPU &cpu, unsigned char operand) {
+void CPU::instructions::AND(CPU &cpu, unsigned char operand) {
     cpu.A = cpu.A & operand;
 
     cpu.set_ZN(cpu.A);
 }
 
-void AND_I(CPU &cpu) {
+void CPU::instructions::AND_I(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.PC+1));
 
     cpu.cycles += 2;
     cpu.PC += 2;
 }
 
-void AND_ZP(CPU &cpu) {
+void CPU::instructions::AND_ZP(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.ZP_addressing()));
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void AND_ZPX(CPU &cpu) {
+void CPU::instructions::AND_ZPX(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.ZPX_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void AND_A(CPU &cpu) {
+void CPU::instructions::AND_A(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.A_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void AND_AX(CPU &cpu) {
+void CPU::instructions::AND_AX(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.AX_addressing()));
 
     if (cpu.page_cross_AX()) cpu.cycles++;
@@ -295,7 +133,7 @@ void AND_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void AND_AY(CPU &cpu) {
+void CPU::instructions::AND_AY(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.AY_addressing()));
 
     if (cpu.page_cross_AY()) cpu.cycles++;
@@ -303,14 +141,14 @@ void AND_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void AND_IX(CPU &cpu) {
+void CPU::instructions::AND_IX(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.IX_addressing()));
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void AND_IY(CPU &cpu) {
+void CPU::instructions::AND_IY(CPU &cpu) {
     AND(cpu, cpu.mem(cpu.IY_addressing()));
 
     if (cpu.page_cross_IY()) cpu.cycles++;
@@ -318,7 +156,7 @@ void AND_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ASL_AC(CPU &cpu) {
+void CPU::instructions::ASL_AC(CPU &cpu) {
     if (cpu.A >= 128) cpu.set_carry();
     else cpu.clear_carry();
 
@@ -330,7 +168,7 @@ void ASL_AC(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void ASL_ZP(CPU &cpu) {
+void CPU::instructions::ASL_ZP(CPU &cpu) {
     unsigned short int address = cpu.ZP_addressing();
 
     if (cpu.mem(address) >= 128) cpu.set_carry();
@@ -344,7 +182,7 @@ void ASL_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ASL_ZPX(CPU &cpu) {
+void CPU::instructions::ASL_ZPX(CPU &cpu) {
     unsigned short int address = cpu.ZPX_addressing();
 
     if (cpu.mem(address) >= 128) cpu.set_carry();
@@ -358,7 +196,7 @@ void ASL_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ASL_A(CPU &cpu) {
+void CPU::instructions::ASL_A(CPU &cpu) {
     unsigned short int address = cpu.A_addressing();
 
     if (cpu.mem(address) >= 128) cpu.set_carry();
@@ -372,7 +210,7 @@ void ASL_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ASL_AX(CPU &cpu) {
+void CPU::instructions::ASL_AX(CPU &cpu) {
     unsigned short int address = cpu.AX_addressing();
 
     if (cpu.mem(address) >= 128) cpu.set_carry();
@@ -386,7 +224,7 @@ void ASL_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void BCC(CPU &cpu) {
+void CPU::instructions::BCC(CPU &cpu) {
     if (cpu.get_carry() == 0) {
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -397,7 +235,7 @@ void BCC(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BCS(CPU &cpu) {
+void CPU::instructions::BCS(CPU &cpu) {
     if (cpu.get_carry() == 1) { 
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -408,7 +246,7 @@ void BCS(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BEQ(CPU &cpu) {
+void CPU::instructions::BEQ(CPU &cpu) {
     if (cpu.get_zero() == 1) { 
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -419,7 +257,7 @@ void BEQ(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BIT(CPU &cpu, unsigned char operand) {
+void CPU::instructions::BIT(CPU &cpu, unsigned char operand) {
     if ((bool)(operand & 0x40) == 1) cpu.set_overflow();
     else cpu.clear_overflow();
 
@@ -430,7 +268,7 @@ void BIT(CPU &cpu, unsigned char operand) {
     else cpu.clear_zero();
 }
 
-void BIT_ZP(CPU &cpu) {
+void CPU::instructions::BIT_ZP(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.ZP_addressing());
 
     BIT(cpu, operand);
@@ -439,7 +277,7 @@ void BIT_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BIT_A(CPU &cpu) {
+void CPU::instructions::BIT_A(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.A_addressing());
 
     BIT(cpu, operand);
@@ -448,7 +286,7 @@ void BIT_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void BMI(CPU &cpu) {
+void CPU::instructions::BMI(CPU &cpu) {
     if (cpu.get_negative() == 1) { 
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -459,7 +297,7 @@ void BMI(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BNE(CPU &cpu) {
+void CPU::instructions::BNE(CPU &cpu) {
     if (cpu.get_zero() == 0) { 
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -470,7 +308,7 @@ void BNE(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BPL(CPU &cpu) {
+void CPU::instructions::BPL(CPU &cpu) {
     if (cpu.get_negative() == 0) {
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -481,7 +319,7 @@ void BPL(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BRK(CPU &cpu) {
+void CPU::instructions::BRK(CPU &cpu) {
     cpu.stack_push_16bit(cpu.PC);
     cpu.stack_push(cpu.STATUS);
     cpu.set_brk();
@@ -491,7 +329,7 @@ void BRK(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void BVC(CPU &cpu) {
+void CPU::instructions::BVC(CPU &cpu) {
     if (cpu.get_overflow() == 0) {
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++; 
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -502,7 +340,7 @@ void BVC(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void BVS(CPU &cpu) {
+void CPU::instructions::BVS(CPU &cpu) {
     if (cpu.get_overflow() == 1) { 
         if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
@@ -513,35 +351,35 @@ void BVS(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void CLC(CPU &cpu) {
+void CPU::instructions::CLC(CPU &cpu) {
     cpu.clear_carry();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void CLD(CPU &cpu) {
+void CPU::instructions::CLD(CPU &cpu) {
     cpu.clear_decimal();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void CLI(CPU &cpu) {
+void CPU::instructions::CLI(CPU &cpu) {
     cpu.clear_interrupt_disable();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void CLV(CPU &cpu) {
+void CPU::instructions::CLV(CPU &cpu) {
     cpu.clear_overflow();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void CMP(CPU &cpu, unsigned char operand) {
+void CPU::instructions::CMP(CPU &cpu, unsigned char operand) {
     if (cpu.A >= operand) {
         cpu.set_carry();
     }
@@ -550,35 +388,35 @@ void CMP(CPU &cpu, unsigned char operand) {
     cpu.set_ZN(cpu.A - operand);
 }
 
-void CMP_I(CPU &cpu) {
+void CPU::instructions::CMP_I(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.PC+1));
 
     cpu.cycles += 2;
     cpu.PC += 2;
 }
 
-void CMP_ZP(CPU &cpu) {
+void CPU::instructions::CMP_ZP(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.ZP_addressing()));
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void CMP_ZPX(CPU &cpu) {
+void CPU::instructions::CMP_ZPX(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.ZPX_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void CMP_A(CPU &cpu) {
+void CPU::instructions::CMP_A(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.A_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void CMP_AX(CPU &cpu) {
+void CPU::instructions::CMP_AX(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.AX_addressing()));
 
     if (cpu.page_cross_AX()) cpu.cycles++;
@@ -586,7 +424,7 @@ void CMP_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void CMP_AY(CPU &cpu) {
+void CPU::instructions::CMP_AY(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.AY_addressing()));
 
     if (cpu.page_cross_AY()) cpu.cycles++;
@@ -594,14 +432,14 @@ void CMP_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void CMP_IX(CPU &cpu) {
+void CPU::instructions::CMP_IX(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.IX_addressing()));
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void CMP_IY(CPU &cpu) {
+void CPU::instructions::CMP_IY(CPU &cpu) {
     CMP(cpu, cpu.mem(cpu.IY_addressing()));
 
     if (cpu.page_cross_IY()) cpu.cycles++;
@@ -609,7 +447,7 @@ void CMP_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void CPX(CPU &cpu, unsigned char operand) {
+void CPU::instructions::CPX(CPU &cpu, unsigned char operand) {
     if (cpu.X >= operand) {
         cpu.set_carry();
     }
@@ -618,28 +456,28 @@ void CPX(CPU &cpu, unsigned char operand) {
     cpu.set_ZN(cpu.X - operand);
 }
 
-void CPX_I(CPU &cpu) {
+void CPU::instructions::CPX_I(CPU &cpu) {
     CPX(cpu, cpu.mem(cpu.PC+1));
 
     cpu.cycles += 2;
     cpu.PC += 2;
 }
 
-void CPX_ZP(CPU &cpu) {
+void CPU::instructions::CPX_ZP(CPU &cpu) {
     CPX(cpu, cpu.mem(cpu.ZP_addressing()));
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void CPX_A(CPU &cpu) {
+void CPU::instructions::CPX_A(CPU &cpu) {
     CPX(cpu, cpu.mem(cpu.A_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void CPY(CPU &cpu, unsigned char operand) {
+void CPU::instructions::CPY(CPU &cpu, unsigned char operand) {
     if (cpu.Y >= operand) {
         cpu.set_carry();
     }
@@ -648,62 +486,62 @@ void CPY(CPU &cpu, unsigned char operand) {
     cpu.set_ZN(cpu.Y - operand);
 }
 
-void CPY_I(CPU &cpu) {
+void CPU::instructions::CPY_I(CPU &cpu) {
     CPY(cpu, cpu.mem(cpu.PC+1));
 
     cpu.cycles += 2;
     cpu.PC += 2;
 }
 
-void CPY_ZP(CPU &cpu) {
+void CPU::instructions::CPY_ZP(CPU &cpu) {
     CPY(cpu, cpu.mem(cpu.ZP_addressing()));
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void CPY_A(CPU &cpu) {
+void CPU::instructions::CPY_A(CPU &cpu) {
     CPY(cpu, cpu.mem(cpu.A_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void DEC(CPU &cpu, unsigned short int address) {
+void CPU::instructions::DEC(CPU &cpu, unsigned short int address) {
     cpu.mem_store(address, cpu.mem(address)-1);
 
     cpu.set_ZN(cpu.mem(address));
 }
 
-void DEC_ZP(CPU &cpu) {
+void CPU::instructions::DEC_ZP(CPU &cpu) {
     DEC(cpu, cpu.ZP_addressing());
 
     cpu.cycles += 5;
     cpu.PC += 2;
 }
 
-void DEC_ZPX(CPU &cpu) {
+void CPU::instructions::DEC_ZPX(CPU &cpu) {
     DEC(cpu, cpu.ZPX_addressing());
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void DEC_A(CPU &cpu) {
+void CPU::instructions::DEC_A(CPU &cpu) {
     DEC(cpu, cpu.A_addressing());
 
     cpu.cycles += 6;
     cpu.PC += 3;
 }
 
-void DEC_AX(CPU &cpu) {
+void CPU::instructions::DEC_AX(CPU &cpu) {
     DEC(cpu, cpu.AX_addressing());
 
     cpu.cycles += 7;
     cpu.PC += 3;
 }
 
-void DEX(CPU &cpu) {
+void CPU::instructions::DEX(CPU &cpu) {
     cpu.X--;
     cpu.set_ZN(cpu.X);
 
@@ -711,7 +549,7 @@ void DEX(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void DEY(CPU &cpu) {
+void CPU::instructions::DEY(CPU &cpu) {
     cpu.Y--;
     cpu.set_ZN(cpu.Y);
 
@@ -719,40 +557,40 @@ void DEY(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void EOR(CPU &cpu, unsigned char operand) {
+void CPU::instructions::EOR(CPU &cpu, unsigned char operand) {
     cpu.A = cpu.A ^ operand;
     cpu.set_ZN(cpu.A);
 }
 
-void EOR_I(CPU &cpu) {
+void CPU::instructions::EOR_I(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.PC+1));
 
     cpu.cycles += 2;
     cpu.PC += 2;
 }
 
-void EOR_ZP(CPU &cpu) {
+void CPU::instructions::EOR_ZP(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.ZP_addressing()));
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void EOR_ZPX(CPU &cpu) {
+void CPU::instructions::EOR_ZPX(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.ZPX_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void EOR_A(CPU &cpu) {
+void CPU::instructions::EOR_A(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.A_addressing()));
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void EOR_AX(CPU &cpu) {
+void CPU::instructions::EOR_AX(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.AX_addressing()));
 
     if (cpu.page_cross_AX()) cpu.cycles++;
@@ -760,7 +598,7 @@ void EOR_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void EOR_AY(CPU &cpu) {
+void CPU::instructions::EOR_AY(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.AY_addressing()));
 
     if (cpu.page_cross_AY()) cpu.cycles++;
@@ -768,14 +606,14 @@ void EOR_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void EOR_IX(CPU &cpu) {
+void CPU::instructions::EOR_IX(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.IX_addressing()));
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void EOR_IY(CPU &cpu) {
+void CPU::instructions::EOR_IY(CPU &cpu) {
     EOR(cpu, cpu.mem(cpu.IY_addressing()));
 
     if (cpu.page_cross_IY()) cpu.cycles++;
@@ -783,40 +621,40 @@ void EOR_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void INC(CPU &cpu, unsigned short int address) {
+void CPU::instructions::INC(CPU &cpu, unsigned short int address) {
     cpu.mem_store(address, cpu.mem(address)+1);
     cpu.set_ZN(cpu.mem(address));
 }
 
-void INC_ZP(CPU &cpu) {
+void CPU::instructions::INC_ZP(CPU &cpu) {
     INC(cpu, cpu.ZP_addressing());
 
     cpu.cycles += 5;
     cpu.PC += 2;
 }
 
-void INC_ZPX(CPU &cpu) {
+void CPU::instructions::INC_ZPX(CPU &cpu) {
     INC(cpu, cpu.ZPX_addressing());
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void INC_A(CPU &cpu) {
+void CPU::instructions::INC_A(CPU &cpu) {
     INC(cpu, cpu.A_addressing());
 
     cpu.cycles += 6;
     cpu.PC += 3;
 }
 
-void INC_AX(CPU &cpu) {
+void CPU::instructions::INC_AX(CPU &cpu) {
     INC(cpu, cpu.AX_addressing());
 
     cpu.cycles += 7;
     cpu.PC += 3;
 }
 
-void INX(CPU &cpu) {
+void CPU::instructions::INX(CPU &cpu) {
     cpu.X++;
     cpu.set_ZN(cpu.X);
 
@@ -824,7 +662,7 @@ void INX(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void INY(CPU &cpu) {
+void CPU::instructions::INY(CPU &cpu) {
     cpu.Y++;
     cpu.set_ZN(cpu.Y);
 
@@ -832,13 +670,13 @@ void INY(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void JMP_A(CPU &cpu) {
+void CPU::instructions::JMP_A(CPU &cpu) {
     cpu.PC = cpu.A_addressing();
 
     cpu.cycles += 3;
 }
 
-void JMP_I(CPU &cpu) {
+void CPU::instructions::JMP_I(CPU &cpu) {
     if ((cpu.mem(cpu.PC+1) & 0xFF) == 0xFF) {
         // Implements JMP instruction bug.
         cpu.PC = cpu.mem(cpu.mem(cpu.PC+2)*256 + cpu.mem(0x00))*256 + 
@@ -850,14 +688,14 @@ void JMP_I(CPU &cpu) {
     cpu.cycles += 5;
 }
 
-void JSR(CPU &cpu) {
+void CPU::instructions::JSR(CPU &cpu) {
     cpu.stack_push_16bit(cpu.PC+2);
     cpu.PC = cpu.A_addressing();
 
     cpu.cycles += 6;
 }
 
-void LDA_I(CPU &cpu) {
+void CPU::instructions::LDA_I(CPU &cpu) {
     cpu.A = cpu.mem(cpu.PC+1);
     cpu.set_ZN(cpu.A);
 
@@ -865,7 +703,7 @@ void LDA_I(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDA_ZP(CPU &cpu) {
+void CPU::instructions::LDA_ZP(CPU &cpu) {
     cpu.A = cpu.mem(cpu.ZP_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -873,7 +711,7 @@ void LDA_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDA_ZPX(CPU &cpu) {
+void CPU::instructions::LDA_ZPX(CPU &cpu) {
     cpu.A = cpu.mem(cpu.ZPX_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -881,7 +719,7 @@ void LDA_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDA_A(CPU &cpu) {
+void CPU::instructions::LDA_A(CPU &cpu) {
     cpu.A = cpu.mem(cpu.A_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -889,7 +727,7 @@ void LDA_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LDA_AX(CPU &cpu) {
+void CPU::instructions::LDA_AX(CPU &cpu) {
     cpu.A = cpu.mem(cpu.AX_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -898,7 +736,7 @@ void LDA_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LDA_AY(CPU &cpu) {
+void CPU::instructions::LDA_AY(CPU &cpu) {
     cpu.A = cpu.mem(cpu.AY_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -907,7 +745,7 @@ void LDA_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LDA_IX(CPU &cpu) {
+void CPU::instructions::LDA_IX(CPU &cpu) {
     cpu.A = cpu.mem(cpu.IX_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -915,7 +753,7 @@ void LDA_IX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDA_IY(CPU &cpu) {
+void CPU::instructions::LDA_IY(CPU &cpu) {
     cpu.A = cpu.mem(cpu.IY_addressing());
     cpu.set_ZN(cpu.A);
 
@@ -924,7 +762,7 @@ void LDA_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDX_I(CPU &cpu) {
+void CPU::instructions::LDX_I(CPU &cpu) {
     cpu.X = cpu.mem(cpu.PC+1);
     cpu.set_ZN(cpu.X);
 
@@ -932,7 +770,7 @@ void LDX_I(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDX_ZP(CPU &cpu) {
+void CPU::instructions::LDX_ZP(CPU &cpu) {
     cpu.X = cpu.mem(cpu.ZP_addressing());
     cpu.set_ZN(cpu.X);
 
@@ -940,7 +778,7 @@ void LDX_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDX_ZPY(CPU &cpu) {
+void CPU::instructions::LDX_ZPY(CPU &cpu) {
     cpu.X = cpu.mem(cpu.ZPY_addressing());
     cpu.set_ZN(cpu.X);
 
@@ -948,7 +786,7 @@ void LDX_ZPY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDX_A(CPU &cpu) {
+void CPU::instructions::LDX_A(CPU &cpu) {
     cpu.X = cpu.mem(cpu.A_addressing());
     cpu.set_ZN(cpu.X);
 
@@ -956,7 +794,7 @@ void LDX_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LDX_AY(CPU &cpu) {
+void CPU::instructions::LDX_AY(CPU &cpu) {
     cpu.X = cpu.mem(cpu.AY_addressing());
     cpu.set_ZN(cpu.X);
 
@@ -965,7 +803,7 @@ void LDX_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LDY_I(CPU &cpu) {
+void CPU::instructions::LDY_I(CPU &cpu) {
     cpu.Y = cpu.mem(cpu.PC+1);
     cpu.set_ZN(cpu.Y);
 
@@ -973,7 +811,7 @@ void LDY_I(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDY_ZP(CPU &cpu) {
+void CPU::instructions::LDY_ZP(CPU &cpu) {
     cpu.Y = cpu.mem(cpu.ZP_addressing());
     cpu.set_ZN(cpu.Y);
 
@@ -981,7 +819,7 @@ void LDY_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDY_ZPX(CPU &cpu) {
+void CPU::instructions::LDY_ZPX(CPU &cpu) {
     cpu.Y = cpu.mem(cpu.ZPX_addressing());
     cpu.set_ZN(cpu.Y);
 
@@ -989,7 +827,7 @@ void LDY_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LDY_A(CPU &cpu) {
+void CPU::instructions::LDY_A(CPU &cpu) {
     cpu.Y = cpu.mem(cpu.A_addressing());
     cpu.set_ZN(cpu.Y);
 
@@ -997,7 +835,7 @@ void LDY_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LDY_AX(CPU &cpu) {
+void CPU::instructions::LDY_AX(CPU &cpu) {
     cpu.Y = cpu.mem(cpu.AX_addressing());
 
     cpu.set_ZN(cpu.Y);
@@ -1007,7 +845,7 @@ void LDY_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LSR_AC(CPU &cpu) {
+void CPU::instructions::LSR_AC(CPU &cpu) {
     if ((cpu.A & 0x1) == 1) cpu.set_carry();
     else cpu.clear_carry();
 
@@ -1019,7 +857,7 @@ void LSR_AC(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void LSR_ZP(CPU &cpu) {
+void CPU::instructions::LSR_ZP(CPU &cpu) {
     unsigned short int address = cpu.ZP_addressing();
 
     if ((cpu.mem(address) & 0x1) == 1) cpu.set_carry();
@@ -1033,7 +871,7 @@ void LSR_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LSR_ZPX(CPU &cpu) {
+void CPU::instructions::LSR_ZPX(CPU &cpu) {
     unsigned short int address = cpu.ZPX_addressing();
 
     if ((cpu.mem(address) & 0x1) == 1) cpu.set_carry();
@@ -1047,7 +885,7 @@ void LSR_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void LSR_A(CPU &cpu) {
+void CPU::instructions::LSR_A(CPU &cpu) {
     unsigned short int address = cpu.A_addressing();
 
     if ((cpu.mem(address) & 0x1) == 1) cpu.set_carry();
@@ -1061,7 +899,7 @@ void LSR_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void LSR_AX(CPU &cpu) {
+void CPU::instructions::LSR_AX(CPU &cpu) {
     unsigned short int address = cpu.AX_addressing();
 
     if ((cpu.mem(address) & 0x1) == 1) cpu.set_carry();
@@ -1075,12 +913,12 @@ void LSR_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void NOP(CPU &cpu) {
+void CPU::instructions::NOP(CPU &cpu) {
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void ORA_I(CPU &cpu) {
+void CPU::instructions::ORA_I(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.PC+1);
 
     cpu.set_ZN(cpu.A);
@@ -1089,7 +927,7 @@ void ORA_I(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ORA_ZP(CPU &cpu) {
+void CPU::instructions::ORA_ZP(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.ZP_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1098,7 +936,7 @@ void ORA_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ORA_ZPX(CPU &cpu) {
+void CPU::instructions::ORA_ZPX(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.ZPX_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1107,7 +945,7 @@ void ORA_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ORA_A(CPU &cpu) {
+void CPU::instructions::ORA_A(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.A_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1116,7 +954,7 @@ void ORA_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ORA_AX(CPU &cpu) {
+void CPU::instructions::ORA_AX(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.AX_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1126,7 +964,7 @@ void ORA_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ORA_AY(CPU &cpu) {
+void CPU::instructions::ORA_AY(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.AY_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1136,7 +974,7 @@ void ORA_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ORA_IX(CPU &cpu) {
+void CPU::instructions::ORA_IX(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.IX_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1145,7 +983,7 @@ void ORA_IX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ORA_IY(CPU &cpu) {
+void CPU::instructions::ORA_IY(CPU &cpu) {
     cpu.A = cpu.A | cpu.mem(cpu.IY_addressing());
 
     cpu.set_ZN(cpu.A);
@@ -1155,21 +993,21 @@ void ORA_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void PHA(CPU &cpu) {
+void CPU::instructions::PHA(CPU &cpu) {
     cpu.stack_push(cpu.A);
 
     cpu.cycles += 3;
     cpu.PC += 1;
 }
 
-void PHP(CPU &cpu) {
+void CPU::instructions::PHP(CPU &cpu) {
     cpu.stack_push(cpu.STATUS);
 
     cpu.cycles += 3;
     cpu.PC += 1;
 }
 
-void PLA(CPU &cpu) {
+void CPU::instructions::PLA(CPU &cpu) {
     cpu.A = cpu.stack_pull();
 
     cpu.set_ZN(cpu.A);
@@ -1178,7 +1016,7 @@ void PLA(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void PLP(CPU &cpu) {
+void CPU::instructions::PLP(CPU &cpu) {
     // Break flag is discarded and the unused bit is always set on PLP and RTI
     cpu.STATUS = (cpu.stack_pull() & 0xEF) | 0x20;
 
@@ -1186,7 +1024,7 @@ void PLP(CPU &cpu) {
     cpu.PC += 1;
 }
 
-unsigned char ROL(CPU &cpu, unsigned char operand) {
+unsigned char CPU::instructions::ROL(CPU &cpu, unsigned char operand) {
     unsigned char aux_carry = cpu.get_carry();
 
     if ((operand >> 7) == 1) cpu.set_carry();
@@ -1195,7 +1033,7 @@ unsigned char ROL(CPU &cpu, unsigned char operand) {
     return (operand << 1) + aux_carry;
 }
 
-void ROL_AC(CPU &cpu) {
+void CPU::instructions::ROL_AC(CPU &cpu) {
     cpu.A = ROL(cpu, cpu.A);
 
     cpu.set_ZN(cpu.A);
@@ -1204,7 +1042,7 @@ void ROL_AC(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void ROL_ZP(CPU &cpu) {
+void CPU::instructions::ROL_ZP(CPU &cpu) {
     unsigned short int address = cpu.ZP_addressing();
 
     cpu.mem_store(address, ROL(cpu, cpu.mem(address)));
@@ -1215,7 +1053,7 @@ void ROL_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ROL_ZPX(CPU &cpu) {
+void CPU::instructions::ROL_ZPX(CPU &cpu) {
     unsigned short int address = cpu.ZPX_addressing();
 
     cpu.mem_store(address, ROL(cpu, cpu.mem(address)));
@@ -1226,7 +1064,7 @@ void ROL_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ROL_A(CPU &cpu) {
+void CPU::instructions::ROL_A(CPU &cpu) {
     unsigned short int address = cpu.A_addressing();
 
     cpu.mem_store(address, ROL(cpu, cpu.mem(address)));
@@ -1237,7 +1075,7 @@ void ROL_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ROL_AX(CPU &cpu) {
+void CPU::instructions::ROL_AX(CPU &cpu) {
     unsigned short int address = cpu.AX_addressing();
 
     cpu.mem_store(address, ROL(cpu, cpu.mem(address)));
@@ -1248,7 +1086,7 @@ void ROL_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-unsigned char ROR(CPU &cpu, unsigned char operand) {
+unsigned char CPU::instructions::ROR(CPU &cpu, unsigned char operand) {
     unsigned char aux_carry = cpu.get_carry();
 
     if ((operand & 1) == 1) cpu.set_carry();
@@ -1257,7 +1095,7 @@ unsigned char ROR(CPU &cpu, unsigned char operand) {
     return (operand >> 1) + (aux_carry << 7);
 }
 
-void ROR_AC(CPU &cpu) {
+void CPU::instructions::ROR_AC(CPU &cpu) {
     cpu.A = ROR(cpu, cpu.A);
 
     cpu.set_ZN(cpu.A);
@@ -1266,7 +1104,7 @@ void ROR_AC(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void ROR_ZP(CPU &cpu) {
+void CPU::instructions::ROR_ZP(CPU &cpu) {
     unsigned short int address = cpu.ZP_addressing();
 
     cpu.mem_store(address, ROR(cpu, cpu.mem(address)));
@@ -1277,7 +1115,7 @@ void ROR_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ROR_ZPX(CPU &cpu) {
+void CPU::instructions::ROR_ZPX(CPU &cpu) {
     unsigned short int address = cpu.ZPX_addressing();
 
     cpu.mem_store(address, ROR(cpu, cpu.mem(address)));
@@ -1288,7 +1126,7 @@ void ROR_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void ROR_A(CPU &cpu) {
+void CPU::instructions::ROR_A(CPU &cpu) {
     unsigned short int address = cpu.A_addressing();
 
     cpu.mem_store(address, ROR(cpu, cpu.mem(address)));
@@ -1299,7 +1137,7 @@ void ROR_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void ROR_AX(CPU &cpu) {
+void CPU::instructions::ROR_AX(CPU &cpu) {
     unsigned short int address = cpu.AX_addressing();
 
     cpu.mem_store(address, ROR(cpu, cpu.mem(address)));
@@ -1310,7 +1148,7 @@ void ROR_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void RTI(CPU &cpu) {
+void CPU::instructions::RTI(CPU &cpu) {
     // Break flag is discarded and the unused bit is always set on PLP and RTI
     cpu.STATUS = (cpu.stack_pull() & 0xEF) | 0x20;
     cpu.PC = cpu.stack_pull_16bit();
@@ -1318,14 +1156,14 @@ void RTI(CPU &cpu) {
     cpu.cycles += 6;
 }
 
-void RTS(CPU &cpu) {
+void CPU::instructions::RTS(CPU &cpu) {
     cpu.PC = cpu.stack_pull_16bit();
 
     cpu.cycles += 6;
     cpu.PC += 1;
 }
 
-void SBC_I(CPU &cpu) {
+void CPU::instructions::SBC_I(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.PC+1);
 
     ADC(cpu, operand ^ 0xFF);
@@ -1334,7 +1172,7 @@ void SBC_I(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void SBC_ZP(CPU &cpu) {
+void CPU::instructions::SBC_ZP(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.ZP_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1343,7 +1181,7 @@ void SBC_ZP(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void SBC_ZPX(CPU &cpu) {
+void CPU::instructions::SBC_ZPX(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.ZPX_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1352,7 +1190,7 @@ void SBC_ZPX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void SBC_A(CPU &cpu) {
+void CPU::instructions::SBC_A(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.A_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1361,7 +1199,7 @@ void SBC_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void SBC_AX(CPU &cpu) {
+void CPU::instructions::SBC_AX(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.AX_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1371,7 +1209,7 @@ void SBC_AX(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void SBC_AY(CPU &cpu) {
+void CPU::instructions::SBC_AY(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.AY_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1381,7 +1219,7 @@ void SBC_AY(CPU &cpu) {
     cpu.PC += 3;
 }
 
-void SBC_IX(CPU &cpu) {
+void CPU::instructions::SBC_IX(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.IX_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1390,7 +1228,7 @@ void SBC_IX(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void SBC_IY(CPU &cpu) {
+void CPU::instructions::SBC_IY(CPU &cpu) {
     unsigned char operand = cpu.mem(cpu.IY_addressing());
 
     ADC(cpu, operand ^ 0xFF);
@@ -1400,119 +1238,119 @@ void SBC_IY(CPU &cpu) {
     cpu.PC += 2;
 }
 
-void SEC(CPU &cpu) {
+void CPU::instructions::SEC(CPU &cpu) {
     cpu.set_carry();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void SED(CPU &cpu) {
+void CPU::instructions::SED(CPU &cpu) {
     cpu.set_decimal();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void SEI(CPU &cpu) {
+void CPU::instructions::SEI(CPU &cpu) {
     cpu.set_interrupt_disable();
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void STA_ZP(CPU &cpu) {
+void CPU::instructions::STA_ZP(CPU &cpu) {
     cpu.mem_store(cpu.ZP_addressing(), cpu.A);
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void STA_ZPX(CPU &cpu) {
+void CPU::instructions::STA_ZPX(CPU &cpu) {
     cpu.mem_store(cpu.ZPX_addressing(), cpu.A);
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void STA_A(CPU &cpu) {
+void CPU::instructions::STA_A(CPU &cpu) {
     cpu.mem_store(cpu.A_addressing(), cpu.A);
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void STA_AX(CPU &cpu) {
+void CPU::instructions::STA_AX(CPU &cpu) {
     cpu.mem_store(cpu.AX_addressing(), cpu.A);
 
     cpu.cycles += 5;
     cpu.PC += 3;
 }
 
-void STA_AY(CPU &cpu) {
+void CPU::instructions::STA_AY(CPU &cpu) {
     cpu.mem_store(cpu.AY_addressing(), cpu.A);
 
     cpu.cycles += 5;
     cpu.PC += 3;
 }
 
-void STA_IX(CPU &cpu) {
+void CPU::instructions::STA_IX(CPU &cpu) {
     cpu.mem_store(cpu.IX_addressing(), cpu.A);
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void STA_IY(CPU &cpu) {
+void CPU::instructions::STA_IY(CPU &cpu) {
     cpu.mem_store(cpu.IY_addressing(), cpu.A);
 
     cpu.cycles += 6;
     cpu.PC += 2;
 }
 
-void STX_ZP(CPU &cpu) {
+void CPU::instructions::STX_ZP(CPU &cpu) {
     cpu.mem_store(cpu.ZP_addressing(), cpu.X);
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void STX_ZPY(CPU &cpu) {
+void CPU::instructions::STX_ZPY(CPU &cpu) {
     cpu.mem_store(cpu.ZPY_addressing(), cpu.X);
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void STX_A(CPU &cpu) {
+void CPU::instructions::STX_A(CPU &cpu) {
     cpu.mem_store(cpu.A_addressing(), cpu.X);
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void STY_ZP(CPU &cpu) {
+void CPU::instructions::STY_ZP(CPU &cpu) {
     cpu.mem_store(cpu.ZP_addressing(), cpu.Y);
 
     cpu.cycles += 3;
     cpu.PC += 2;
 }
 
-void STY_ZPX(CPU &cpu) {
+void CPU::instructions::STY_ZPX(CPU &cpu) {
     cpu.mem_store(cpu.ZPX_addressing(), cpu.Y);
 
     cpu.cycles += 4;
     cpu.PC += 2;
 }
 
-void STY_A(CPU &cpu) {
+void CPU::instructions::STY_A(CPU &cpu) {
     cpu.mem_store(cpu.A_addressing(), cpu.Y);
 
     cpu.cycles += 4;
     cpu.PC += 3;
 }
 
-void TAX(CPU &cpu) {
+void CPU::instructions::TAX(CPU &cpu) {
     cpu.X = cpu.A;
 
     cpu.set_ZN(cpu.X);
@@ -1521,7 +1359,7 @@ void TAX(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void TAY(CPU &cpu) {
+void CPU::instructions::TAY(CPU &cpu) {
     cpu.Y = cpu.A;
 
     cpu.set_ZN(cpu.Y);
@@ -1530,7 +1368,7 @@ void TAY(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void TSX(CPU &cpu) {
+void CPU::instructions::TSX(CPU &cpu) {
     cpu.X = cpu.SP;
 
     cpu.set_ZN(cpu.X);
@@ -1539,7 +1377,7 @@ void TSX(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void TXA(CPU &cpu) {
+void CPU::instructions::TXA(CPU &cpu) {
     cpu.A = cpu.X;
 
     cpu.set_ZN(cpu.A);
@@ -1548,14 +1386,14 @@ void TXA(CPU &cpu) {
     cpu.PC += 1;
 }
 
-void TXS(CPU &cpu) {
+void CPU::instructions::TXS(CPU &cpu) {
     cpu.SP = cpu.X;
 
     cpu.cycles += 2;
     cpu.PC += 1;
 }
 
-void TYA(CPU &cpu) {
+void CPU::instructions::TYA(CPU &cpu) {
     cpu.A = cpu.Y;
 
     cpu.set_ZN(cpu.A);
@@ -1564,7 +1402,7 @@ void TYA(CPU &cpu) {
     cpu.PC += 1;
 }
 
-std::unordered_map<unsigned char, std::function<void(CPU &)> > opcode_map() {
+std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions::opcode_map() {
     /* Returns an unordered map that receives an opcode (unsigned char) as key and returns
        its respective function as a function pointer */
 

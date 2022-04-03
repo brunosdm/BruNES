@@ -1,13 +1,13 @@
 #include <fstream>
 #include <iostream>
-#include "mappers.h"
+#include "../mappers/mappers.h"
 
 void nestest_load(Mapper **cartridge) {
     char buffer[256];
     unsigned short int address = 0;
     *cartridge = new Mapper_0();
     std::ifstream infile; 
-    infile.open("nestest.nes", std::ios::binary | std::ios::in);
+    infile.open("test/nestest.nes", std::ios::binary | std::ios::in);
     infile.read(buffer, 16);
     for (int i=0; i < 64; i++) {
         infile.read(buffer, 256);

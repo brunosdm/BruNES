@@ -17,6 +17,34 @@ void CPU::instructions::run_instruction(CPU &cpu, unsigned char opcode) {
     opcode_to_inst[opcode](cpu);
 }
 
+void CPU::instructions::AAX_ZP(CPU &cpu)  {
+    cpu.mem_store(cpu.ZP_addressing() ,cpu.A & cpu.X);
+
+    cpu.cycles += 3;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::AAX_ZPY(CPU &cpu)  {
+    cpu.mem_store(cpu.ZPY_addressing() ,cpu.A & cpu.X);
+
+    cpu.cycles += 4;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::AAX_IX(CPU &cpu)  {
+    cpu.mem_store(cpu.IX_addressing() ,cpu.A & cpu.X);
+
+    cpu.cycles += 6;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::AAX_A(CPU &cpu)  {
+    cpu.mem_store(cpu.A_addressing() ,cpu.A & cpu.X);
+
+    cpu.cycles += 4;
+    cpu.PC += 3;
+}
+
 void CPU::instructions::ADC(CPU &cpu, unsigned char operand) {
     unsigned short int add = cpu.A + operand + cpu.get_carry();
 
@@ -226,7 +254,7 @@ void CPU::instructions::ASL_AX(CPU &cpu) {
 
 void CPU::instructions::BCC(CPU &cpu) {
     if (cpu.get_carry() == 0) {
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -237,7 +265,7 @@ void CPU::instructions::BCC(CPU &cpu) {
 
 void CPU::instructions::BCS(CPU &cpu) {
     if (cpu.get_carry() == 1) { 
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -248,7 +276,7 @@ void CPU::instructions::BCS(CPU &cpu) {
 
 void CPU::instructions::BEQ(CPU &cpu) {
     if (cpu.get_zero() == 1) { 
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -288,7 +316,7 @@ void CPU::instructions::BIT_A(CPU &cpu) {
 
 void CPU::instructions::BMI(CPU &cpu) {
     if (cpu.get_negative() == 1) { 
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -299,7 +327,7 @@ void CPU::instructions::BMI(CPU &cpu) {
 
 void CPU::instructions::BNE(CPU &cpu) {
     if (cpu.get_zero() == 0) { 
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -310,7 +338,7 @@ void CPU::instructions::BNE(CPU &cpu) {
 
 void CPU::instructions::BPL(CPU &cpu) {
     if (cpu.get_negative() == 0) {
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -331,7 +359,7 @@ void CPU::instructions::BRK(CPU &cpu) {
 
 void CPU::instructions::BVC(CPU &cpu) {
     if (cpu.get_overflow() == 0) {
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++; 
+        if (cpu.branch_page_cross()) cpu.cycles++; 
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -342,7 +370,7 @@ void CPU::instructions::BVC(CPU &cpu) {
 
 void CPU::instructions::BVS(CPU &cpu) {
     if (cpu.get_overflow() == 1) { 
-        if ((cpu.PC+2 & 0xFF) + cpu.mem(cpu.PC+1) > 0xFF) cpu.cycles++;
+        if (cpu.branch_page_cross()) cpu.cycles++;
         cpu.PC += (char) cpu.mem(cpu.PC+1);
         cpu.cycles++;
     }
@@ -507,6 +535,59 @@ void CPU::instructions::CPY_A(CPU &cpu) {
     cpu.PC += 3;
 }
 
+void CPU::instructions::DCP(CPU &cpu, unsigned short int address) {
+    DEC(cpu, address);
+    CMP(cpu, cpu.mem(address));
+}
+
+void CPU::instructions::DCP_ZP(CPU &cpu) {
+    DCP(cpu, cpu.ZP_addressing());
+
+    cpu.cycles += 5;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::DCP_ZPX(CPU &cpu) {
+    DCP(cpu, cpu.ZPX_addressing());
+
+    cpu.cycles += 6;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::DCP_A(CPU &cpu) {
+    DCP(cpu, cpu.A_addressing());
+
+    cpu.cycles += 6;
+    cpu.PC += 3;
+}
+
+void CPU::instructions::DCP_AX(CPU &cpu) {
+    DCP(cpu, cpu.AX_addressing());
+
+    cpu.cycles += 7;
+    cpu.PC += 3;
+}
+
+void CPU::instructions::DCP_AY(CPU &cpu) {
+    DCP(cpu, cpu.AY_addressing());
+
+    cpu.cycles += 7;
+    cpu.PC += 3;
+}
+void CPU::instructions::DCP_IX(CPU &cpu) {
+    DCP(cpu, cpu.IX_addressing());
+
+    cpu.cycles += 8;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::DCP_IY(CPU &cpu) {
+    DCP(cpu, cpu.IY_addressing());
+
+    cpu.cycles += 8;
+    cpu.PC += 2;
+}
+
 void CPU::instructions::DEC(CPU &cpu, unsigned short int address) {
     cpu.mem_store(address, cpu.mem(address)-1);
 
@@ -555,6 +636,21 @@ void CPU::instructions::DEY(CPU &cpu) {
 
     cpu.cycles += 2;
     cpu.PC += 1;
+}
+
+void CPU::instructions::DOP_I(CPU &cpu) {
+    cpu.cycles += 2;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::DOP_ZP(CPU &cpu) {
+    cpu.cycles += 3;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::DOP_ZPX(CPU &cpu) {
+    cpu.cycles += 4;
+    cpu.PC += 2;
 }
 
 void CPU::instructions::EOR(CPU &cpu, unsigned char operand) {
@@ -693,6 +789,57 @@ void CPU::instructions::JSR(CPU &cpu) {
     cpu.PC = cpu.A_addressing();
 
     cpu.cycles += 6;
+}
+
+void CPU::instructions::LAX(CPU &cpu, unsigned char operand) {
+    cpu.A = operand;
+    cpu.X = operand;
+
+    cpu.set_ZN((char) operand);
+}
+
+void CPU::instructions::LAX_ZP(CPU &cpu) {
+    LAX(cpu, cpu.mem(cpu.ZP_addressing()));
+
+    cpu.cycles += 3;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::LAX_ZPY(CPU &cpu) {
+    LAX(cpu, cpu.mem(cpu.ZPY_addressing()));
+
+    cpu.cycles += 4;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::LAX_A(CPU &cpu) {
+    LAX(cpu, cpu.mem(cpu.A_addressing()));
+
+    cpu.cycles += 4;
+    cpu.PC += 3;
+}
+
+void CPU::instructions::LAX_AY(CPU &cpu) {
+    LAX(cpu, cpu.mem(cpu.AY_addressing()));
+
+    if (cpu.page_cross_AY()) cpu.cycles++;
+    cpu.cycles += 4;
+    cpu.PC += 3;
+}
+
+void CPU::instructions::LAX_IX(CPU &cpu) {
+    LAX(cpu, cpu.mem(cpu.IX_addressing()));
+
+    cpu.cycles += 6;
+    cpu.PC += 2;
+}
+
+void CPU::instructions::LAX_IY(CPU &cpu) {
+    LAX(cpu, cpu.mem(cpu.IY_addressing()));
+
+    if (cpu.page_cross_IY()) cpu.cycles++;
+    cpu.cycles += 5;
+    cpu.PC += 2;
 }
 
 void CPU::instructions::LDA_I(CPU &cpu) {
@@ -1368,6 +1515,17 @@ void CPU::instructions::TAY(CPU &cpu) {
     cpu.PC += 1;
 }
 
+void CPU::instructions::TOP_A(CPU &cpu) {
+    cpu.cycles += 4;
+    cpu.PC += 3;
+}
+
+void CPU::instructions::TOP_AX(CPU &cpu) {
+    if (cpu.page_cross_AX()) cpu.cycles++;
+    cpu.cycles += 4;
+    cpu.PC += 3;
+}
+
 void CPU::instructions::TSX(CPU &cpu) {
     cpu.X = cpu.SP;
 
@@ -1408,6 +1566,11 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
 
     std::unordered_map<unsigned char, std::function<void(CPU &)> > opcode_map;
 
+    // AAX
+    opcode_map.insert(std::make_pair(0x87, AAX_ZP));
+    opcode_map.insert(std::make_pair(0x97, AAX_ZPY));
+    opcode_map.insert(std::make_pair(0x83, AAX_IX));
+    opcode_map.insert(std::make_pair(0x8F, AAX_A));
     // ADC
     opcode_map.insert(std::make_pair(0x69, ADC_I));
     opcode_map.insert(std::make_pair(0x65, ADC_ZP));
@@ -1478,6 +1641,14 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
     opcode_map.insert(std::make_pair(0xC0, CPY_I));
     opcode_map.insert(std::make_pair(0xC4, CPY_ZP));
     opcode_map.insert(std::make_pair(0xCC, CPY_A));
+    // DCP
+    opcode_map.insert(std::make_pair(0xC7, DCP_ZP));
+    opcode_map.insert(std::make_pair(0xD7, DCP_ZPX));
+    opcode_map.insert(std::make_pair(0xCF, DCP_A));
+    opcode_map.insert(std::make_pair(0xDF, DCP_AX));
+    opcode_map.insert(std::make_pair(0xDB, DCP_AY));
+    opcode_map.insert(std::make_pair(0xC3, DCP_IX));
+    opcode_map.insert(std::make_pair(0xD3, DCP_IY));
     // DEC
     opcode_map.insert(std::make_pair(0xC6, DEC_ZP));
     opcode_map.insert(std::make_pair(0xD6, DEC_ZPX));
@@ -1487,6 +1658,21 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
     opcode_map.insert(std::make_pair(0xCA, DEX));
     // DEY
     opcode_map.insert(std::make_pair(0x88, DEY));
+    // DOP
+    opcode_map.insert(std::make_pair(0x80, DOP_I));
+    opcode_map.insert(std::make_pair(0x82, DOP_I));
+    opcode_map.insert(std::make_pair(0x89, DOP_I));
+    opcode_map.insert(std::make_pair(0xC2, DOP_I));
+    opcode_map.insert(std::make_pair(0xE2, DOP_I));
+    opcode_map.insert(std::make_pair(0x04, DOP_ZP));
+    opcode_map.insert(std::make_pair(0x44, DOP_ZP));
+    opcode_map.insert(std::make_pair(0x64, DOP_ZP));
+    opcode_map.insert(std::make_pair(0x14, DOP_ZPX));
+    opcode_map.insert(std::make_pair(0x34, DOP_ZPX));
+    opcode_map.insert(std::make_pair(0x54, DOP_ZPX));
+    opcode_map.insert(std::make_pair(0x74, DOP_ZPX));
+    opcode_map.insert(std::make_pair(0xD4, DOP_ZPX));
+    opcode_map.insert(std::make_pair(0xF4, DOP_ZPX));
     // EOR
     opcode_map.insert(std::make_pair(0x49, EOR_I));
     opcode_map.insert(std::make_pair(0x45, EOR_ZP));
@@ -1510,6 +1696,13 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
     opcode_map.insert(std::make_pair(0x6C, JMP_I));
     // JSR
     opcode_map.insert(std::make_pair(0x20, JSR));
+    // LAX
+    opcode_map.insert(std::make_pair(0xA7, LAX_ZP));
+    opcode_map.insert(std::make_pair(0xB7, LAX_ZPY));
+    opcode_map.insert(std::make_pair(0xAF, LAX_A));
+    opcode_map.insert(std::make_pair(0xBF, LAX_AY));
+    opcode_map.insert(std::make_pair(0xA3, LAX_IX));
+    opcode_map.insert(std::make_pair(0xB3, LAX_IY));
     // LDA
     opcode_map.insert(std::make_pair(0xA9, LDA_I));
     opcode_map.insert(std::make_pair(0xA5, LDA_ZP));
@@ -1538,7 +1731,13 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
     opcode_map.insert(std::make_pair(0x4E, LSR_A));
     opcode_map.insert(std::make_pair(0x5E, LSR_AX));
     // NOP
+    opcode_map.insert(std::make_pair(0x1A, NOP));
+    opcode_map.insert(std::make_pair(0x3A, NOP));
+    opcode_map.insert(std::make_pair(0x5A, NOP));
+    opcode_map.insert(std::make_pair(0x7A, NOP));
+    opcode_map.insert(std::make_pair(0xDA, NOP));
     opcode_map.insert(std::make_pair(0xEA, NOP));
+    opcode_map.insert(std::make_pair(0xFA, NOP));
     // ORA
     opcode_map.insert(std::make_pair(0x09, ORA_I));
     opcode_map.insert(std::make_pair(0x05, ORA_ZP));
@@ -1574,6 +1773,7 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
     opcode_map.insert(std::make_pair(0x60, RTS));
     // SBC
     opcode_map.insert(std::make_pair(0xE9, SBC_I));
+    opcode_map.insert(std::make_pair(0xEB, SBC_I));
     opcode_map.insert(std::make_pair(0xE5, SBC_ZP));
     opcode_map.insert(std::make_pair(0xF5, SBC_ZPX));
     opcode_map.insert(std::make_pair(0xED, SBC_A));
@@ -1607,6 +1807,14 @@ std::unordered_map<unsigned char, std::function<void(CPU &)> > CPU::instructions
     opcode_map.insert(std::make_pair(0xAA, TAX));
     // TAY
     opcode_map.insert(std::make_pair(0xA8, TAY));
+    // TOP
+    opcode_map.insert(std::make_pair(0x0C, TOP_A));
+    opcode_map.insert(std::make_pair(0x1C, TOP_AX));
+    opcode_map.insert(std::make_pair(0x3C, TOP_AX));
+    opcode_map.insert(std::make_pair(0x5C, TOP_AX));
+    opcode_map.insert(std::make_pair(0x7C, TOP_AX));
+    opcode_map.insert(std::make_pair(0xDC, TOP_AX));
+    opcode_map.insert(std::make_pair(0xFC, TOP_AX));
     // TSX
     opcode_map.insert(std::make_pair(0xBA, TSX));
     // TXA

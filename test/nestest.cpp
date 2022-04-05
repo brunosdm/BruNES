@@ -20,7 +20,7 @@ int main() {
     CPU cpu = CPU(mapper);
     cpu.reset();
 
-    for (int i=0; i < 6000; i++) {
+    for (int i=0; i < 8991; i++) {
         print_line(cpu);
         cpu.run_next_instruction();
     }

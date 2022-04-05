@@ -25,6 +25,10 @@ class CPU {
             private:
                 std::unordered_map<unsigned char, std::function<void(CPU &)> > opcode_to_inst;
                 std::unordered_map<unsigned char, std::function<void(CPU &)> > opcode_map();
+                static void AAX_ZP(CPU &cpu);
+                static void AAX_ZPY(CPU &cpu);
+                static void AAX_A(CPU &cpu);
+                static void AAX_IX(CPU &cpu);
                 static void ADC(CPU &cpu, unsigned char operand);
                 static void ADC_I(CPU &cpu);
                 static void ADC_ZP(CPU &cpu);
@@ -81,6 +85,14 @@ class CPU {
                 static void CPY_I(CPU &cpu);
                 static void CPY_ZP(CPU &cpu);
                 static void CPY_A(CPU &cpu);
+                static void DCP_ZP(CPU &cpu);
+                static void DCP_ZPX(CPU &cpu);
+                static void DCP(CPU &cpu, unsigned short int address);
+                static void DCP_A(CPU &cpu);
+                static void DCP_AX(CPU &cpu);
+                static void DCP_AY(CPU &cpu);
+                static void DCP_IX(CPU &cpu);
+                static void DCP_IY(CPU &cpu);
                 static void DEC(CPU &cpu, unsigned short int address);
                 static void DEC_ZP(CPU &cpu);
                 static void DEC_ZPX(CPU &cpu);
@@ -88,6 +100,9 @@ class CPU {
                 static void DEC_AX(CPU &cpu);
                 static void DEX(CPU &cpu);
                 static void DEY(CPU &cpu);
+                static void DOP_I(CPU &cpu);
+                static void DOP_ZP(CPU &cpu);
+                static void DOP_ZPX(CPU &cpu);
                 static void EOR(CPU &cpu, unsigned char operand);
                 static void EOR_I(CPU &cpu);
                 static void EOR_ZP(CPU &cpu);
@@ -107,6 +122,14 @@ class CPU {
                 static void JMP_A(CPU &cpu);
                 static void JMP_I(CPU &cpu);
                 static void JSR(CPU &cpu);
+                static void LAX(CPU &cpu, unsigned char operand);
+                static void LAX_ZP(CPU &cpu);
+                static void LAX_ZPY(CPU &cpu);
+                static void LAX_A(CPU &cpu);
+                static void LAX_AX(CPU &cpu);
+                static void LAX_AY(CPU &cpu);
+                static void LAX_IX(CPU &cpu);
+                static void LAX_IY(CPU &cpu);
                 static void LDA_I(CPU &cpu);
                 static void LDA_ZP(CPU &cpu);
                 static void LDA_ZPX(CPU &cpu);
@@ -183,6 +206,8 @@ class CPU {
                 static void STY_A(CPU &cpu);  
                 static void TAX(CPU &cpu);  
                 static void TAY(CPU &cpu);
+                static void TOP_A(CPU &cpu);
+                static void TOP_AX(CPU &cpu);
                 static void TSX(CPU &cpu);
                 static void TXA(CPU &cpu);
                 static void TXS(CPU &cpu);
@@ -207,7 +232,8 @@ class CPU {
         unsigned short int stack_pull_16bit();
         bool page_cross_AX();
         bool page_cross_AY();
-        bool page_cross_IY(); 
+        bool page_cross_IY();
+        bool branch_page_cross();
         unsigned char get_carry();
         unsigned char get_zero(); 
         unsigned char get_interrupt_disable();

@@ -100,6 +100,11 @@ bool CPU::page_cross_IY() {
     return false;
 }
 
+bool CPU::branch_page_cross() {
+    if ((PC+2 & 0xFF) + (char) mem(PC+1) > 0xFF) return true;
+    return false;
+}
+
 unsigned char CPU::get_carry() {
     return (bool) (STATUS & 0x01);
 }
